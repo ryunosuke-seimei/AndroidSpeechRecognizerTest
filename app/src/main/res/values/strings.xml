@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">research_test</string>
+    <string name="State">TextView</string>
+    <string name="Result">TextView</string>
+    <string name="TakeResult">TextView</string>
+    <string name="Flag">記録</string>
+    <string name="blood">血糖測定</string>
+    <string name="aspiration">喀痰吸引</string>
+    <string name="exchange">体位交換</string>
 </resources>
