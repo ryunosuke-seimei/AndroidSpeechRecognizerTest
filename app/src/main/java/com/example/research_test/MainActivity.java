@@ -20,7 +20,10 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.Locale;
 
-public class MainActivity extends AppCompatActivity {
+import android.speech.tts.TextToSpeech;
+
+
+public class MainActivity extends AppCompatActivity implements TextToSpeech.OnInitListener{
     TextView State;
     TextView Result;
     TextView TakeResult;
@@ -29,6 +32,9 @@ public class MainActivity extends AppCompatActivity {
     TextView FlagResult1;
     TextView FlagResult2;
     TextView FlagResult3;
+
+    TextToSpeech tts;
+    String contents = "読み上げたい内容";
 
     private int count = 0;
     private final Context context = this;
@@ -55,6 +61,8 @@ public class MainActivity extends AppCompatActivity {
         FlagResult3 = (TextView)findViewById(R.id.ResultState3);
 
         handler.postDelayed(Task, 1000);
+
+        tts = new TextToSpeech(this, this);
 
     }
 
@@ -94,6 +102,11 @@ public class MainActivity extends AppCompatActivity {
             }else if (val.contains("体位") || val.contains("交換")){
                 FlagResult3.setBackgroundColor(Color.rgb(120, 0,0));
             }
+
+//            読み上げ
+            contents = values.get(0);
+            speechText();
+
             handler.postDelayed(Task, 2000);
         }
         @Override public void onBeginningOfSpeech() {}
@@ -144,5 +157,41 @@ public class MainActivity extends AppCompatActivity {
         intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 10);
 
         mRecognizer.startListening(intent);
+    }
+
+    @Override
+    public void onInit(int status) {
+        if (TextToSpeech.SUCCESS == status) {
+            //言語選択
+            Locale locale = Locale.JAPAN;
+            if (tts.isLanguageAvailable(locale) >= TextToSpeech.LANG_AVAILABLE) {
+                tts.setLanguage(locale);
+            } else {
+                Log.d("Error", "Locale");
+            }
+        } else {
+            Log.d("Error", "Init");
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (null != tts) {
+            //ttsのリソース解放する
+            tts.shutdown();
+        }
+    }
+    private void speechText() {
+        if (0 < contents.length()) {
+            if (tts.isSpeaking()) {
+                // 読み上げ中なら停止
+                tts.stop();
+            }
+            //読み上げられているテキストを確認
+            System.out.println(contents);
+            //読み上げ開始
+            tts.speak(contents, TextToSpeech.QUEUE_FLUSH, null);
+        }
     }
 }
