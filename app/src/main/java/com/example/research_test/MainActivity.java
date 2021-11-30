@@ -60,6 +60,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         FlagResult2 = (TextView)findViewById(R.id.ResultState2);
         FlagResult3 = (TextView)findViewById(R.id.ResultState3);
 
+//        認識スタートを遅らせる
         handler.postDelayed(Task, 1000);
 
         tts = new TextToSpeech(this, this);
@@ -191,7 +192,8 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             //読み上げられているテキストを確認
             System.out.println(contents);
             //読み上げ開始
-            tts.speak(contents, TextToSpeech.QUEUE_FLUSH, null);
-        }
+//            tts.speak(contents, TextToSpeech.QUEUE_FLUSH, null);
+            tts.speak(contents, TextToSpeech.QUEUE_FLUSH, null, "messageID");
+            }
     }
 }
