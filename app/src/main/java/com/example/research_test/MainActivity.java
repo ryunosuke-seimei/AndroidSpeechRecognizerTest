@@ -14,6 +14,7 @@ import android.os.Handler;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
+import android.speech.tts.UtteranceProgressListener;
 import android.util.Log;
 import android.widget.TextView;
 
@@ -61,9 +62,11 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         FlagResult3 = (TextView)findViewById(R.id.ResultState3);
 
 //        認識スタートを遅らせる
-        handler.postDelayed(Task, 1000);
+//        handler.postDelayed(Task, 1000);
+
 
         tts = new TextToSpeech(this, this);
+        startSpeechRecognition();
 
     }
 
@@ -107,8 +110,6 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
 //            読み上げ
             contents = values.get(0);
             speechText();
-
-            handler.postDelayed(Task, 2000);
         }
         @Override public void onBeginningOfSpeech() {}
         @Override public void onBufferReceived(byte[] arg0) {
@@ -194,6 +195,37 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             //読み上げ開始
 //            tts.speak(contents, TextToSpeech.QUEUE_FLUSH, null);
             tts.speak(contents, TextToSpeech.QUEUE_FLUSH, null, "messageID");
+            setTtsListener();
+        }
+    }
+    // 読み上げの始まりと終わりを取得
+    private void setTtsListener(){
+        if (Build.VERSION.SDK_INT >= 21){
+            int listenerResult =
+                    tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                        @Override
+                        public void onDone(String utteranceId) {
+                            Log.d(TAG,"progress on Done " + utteranceId);
+                            handler.post(Task);
+                        }
+
+                        @Override
+                        public void onError(String utteranceId) {
+                            Log.d(TAG,"progress on Error " + utteranceId);
+                        }
+
+                        @Override
+                        public void onStart(String utteranceId) {
+                            Log.d(TAG,"progress on Start " + utteranceId);
+                        }
+                    });
+
+            if (listenerResult != TextToSpeech.SUCCESS) {
+                Log.e(TAG, "failed to add utterance progress listener");
             }
+        }
+        else {
+            Log.e(TAG, "Build VERSION is less than API 15");
+        }
     }
 }
