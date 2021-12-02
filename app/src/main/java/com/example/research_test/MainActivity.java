@@ -1,13 +1,22 @@
 package com.example.research_test;
 
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import android.Manifest;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothHeadset;
+import android.bluetooth.BluetoothProfile;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -19,6 +28,7 @@ import android.util.Log;
 import android.widget.TextView;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 import android.speech.tts.TextToSpeech;
@@ -47,6 +57,11 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         }
     };
 
+    private BluetoothAdapter mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+    private BluetoothHeadset mBluetoothHeadset;
+
+    AudioManager audioManager;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,11 +79,132 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
 //        認識スタートを遅らせる
 //        handler.postDelayed(Task, 1000);
 
+        if (mBluetoothAdapter == null) {
+            // Device doesn't support Bluetooth
+        }
+
+        if (!mBluetoothAdapter.isEnabled()) {
+            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(enableBtIntent, 1);
+        }
+
+//        プロファイルの変更
+        audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
+
+        audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+//        audioManager.setMode(AudioManager.MODE_IN_CALL);
+
+        audioManager.startBluetoothSco();
+        audioManager.setBluetoothScoOn(true);
+
+        mBluetoothAdapter.getProfileProxy(this,mProfileListener, BluetoothProfile.HEADSET);
+
 
         tts = new TextToSpeech(this, this);
         startSpeechRecognition();
-
     }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        switch (requestCode) {
+            //SecondActivityから戻ってきた場合
+            case (1):
+                if (resultCode == RESULT_OK) {
+                    //OKボタンを押して戻ってきたときの処理
+                    Log.d("OK", "OK");
+                } else if (resultCode == RESULT_CANCELED) {
+                    //キャンセルボタンを押して戻ってきたときの処理
+                } else {
+                    //その他
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    private BluetoothProfile.ServiceListener mProfileListener = new BluetoothProfile.ServiceListener() {
+        @Override
+        public void onServiceConnected(int profile, BluetoothProfile proxy) {
+            if (profile == BluetoothProfile.HEADSET) {
+                mBluetoothHeadset = (BluetoothHeadset) proxy;
+                //現在接続中のデバイス取得
+                List<BluetoothDevice> devices = mBluetoothHeadset.getConnectedDevices();
+                if(devices.size() > 0){
+                    BluetoothDevice device = devices.get(0);
+                    mBluetoothHeadset.startVoiceRecognition(device);
+                }
+
+            }
+        }
+
+        @Override
+        public void onServiceDisconnected(int profile) {
+            if (profile == BluetoothProfile.HEADSET) {
+                mBluetoothHeadset = null;
+            }
+        }
+    };
+
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED);
+        filter.addAction(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED);
+        filter.addAction(BluetoothHeadset.ACTION_VENDOR_SPECIFIC_HEADSET_EVENT);
+        registerReceiver(mReceiver, filter);
+    }
+    private BroadcastReceiver mReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            Log.d("bluetooth", action);
+            BluetoothDevice device = intent.getExtras().getParcelable(BluetoothDevice.EXTRA_DEVICE);
+
+            int state = intent.getExtras().getInt(BluetoothProfile.EXTRA_STATE);
+            int prevState = intent.getExtras().getInt(BluetoothProfile.EXTRA_PREVIOUS_STATE);
+
+            if (action.equals(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED)) {
+                if (action.equals(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED)){
+                    String stateStr = state == BluetoothHeadset.STATE_CONNECTED ? "CONNECTED"
+                            : state == BluetoothHeadset.STATE_CONNECTING ? "CONNECTING"
+                            : state == BluetoothHeadset.STATE_DISCONNECTED ? "DISCONNECTED"
+                            : state == BluetoothHeadset.STATE_DISCONNECTING ? "DISCONNECTING"
+                            : "Unknown";
+                    String prevStateStr = prevState == BluetoothHeadset.STATE_CONNECTED ? "CONNECTED"
+                            : prevState == BluetoothHeadset.STATE_CONNECTING ? "CONNECTING"
+                            : prevState == BluetoothHeadset.STATE_DISCONNECTED ? "DISCONNECTED"
+                            : prevState == BluetoothHeadset.STATE_DISCONNECTING ? "DISCONNECTING"
+                            : "Unknown";
+
+                    Log.e(TAG, "BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED: EXTRA_DEVICE=" + device.getName() + " EXTRA_STATE=" + stateStr + " EXTRA_PREVIOUS_STATE=" + prevStateStr);
+
+                    if (state == BluetoothHeadset.STATE_CONNECTED){
+                        mBluetoothHeadset.startVoiceRecognition(device);
+                    }else if (prevState == BluetoothHeadset.STATE_CONNECTED){
+                        mBluetoothHeadset.stopVoiceRecognition(device);
+                    }
+
+                }
+                Log.e("bluetooth", action);
+
+            }else if (action.equals(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED)) {
+                String stateStr = state == BluetoothHeadset.STATE_AUDIO_CONNECTED ? "AUDIO_CONNECTED"
+                        : state == BluetoothHeadset.STATE_AUDIO_CONNECTING ? "AUDIO_CONNECTING"
+                        : state == BluetoothHeadset.STATE_AUDIO_DISCONNECTED ? "AUDIO_DISCONNECTED"
+                        : "Unknown";
+                String prevStateStr = prevState == BluetoothHeadset.STATE_AUDIO_CONNECTED ? "AUDIO_CONNECTED"
+                        : prevState == BluetoothHeadset.STATE_AUDIO_CONNECTING ? "AUDIO_CONNECTING"
+                        : prevState == BluetoothHeadset.STATE_AUDIO_DISCONNECTED ? "AUDIO_DISCONNECTED"
+                        : "Unknown";
+                Log.e(TAG, "BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED: EXTRA_DEVICE=" + device.getName() + " EXTRA_STATE=" + stateStr + " EXTRA_PREVIOUS_STATE=" + prevStateStr);
+            }
+
+        }
+    };
 
     private static String TAG = "Sample";
     private SpeechRecognizer mRecognizer;
@@ -183,6 +319,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             //ttsのリソース解放する
             tts.shutdown();
         }
+        audioManager.stopBluetoothSco();
     }
     private void speechText() {
         if (0 < contents.length()) {
@@ -194,8 +331,8 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             System.out.println(contents);
             //読み上げ開始
 //            tts.speak(contents, TextToSpeech.QUEUE_FLUSH, null);
-            tts.speak(contents, TextToSpeech.QUEUE_FLUSH, null, "messageID");
             setTtsListener();
+            tts.speak(contents, TextToSpeech.QUEUE_FLUSH, null, "messageID");
         }
     }
     // 読み上げの始まりと終わりを取得
